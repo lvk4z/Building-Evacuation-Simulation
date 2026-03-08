@@ -23,44 +23,6 @@ The main objectives of this project are:
 
 ------------------------------------------------------------------------
 
-# Modeling Approach
-
-The simulation is based on **microscopic pedestrian modeling**, where
-each individual is represented as an autonomous agent.
-
-## Core concepts
-
-### Agent-Based Modeling (ABM)
-
-Each person is modeled as an independent agent with parameters such as:
-
--   walking speed
--   reaction time
--   personal space radius
--   knowledge of building layout
--   panic level
-
-### Movement Model
-
-Agents move according to principles inspired by the **Social Force Model
-(SFM)**:
-
--   attraction toward exits
--   repulsion from walls and obstacles
--   avoidance of other agents
-
-### Navigation
-
-Agents select paths using graph-based navigation algorithms such as:
-
--   **A\*** (baseline shortest path)
--   **Dijkstra**
--   optional advanced models:
-    -   Nash equilibrium--inspired decision models
-    -   reinforcement learning for adaptive evacuation
-
-------------------------------------------------------------------------
-
 # Key Research Questions
 
 The simulation investigates:
@@ -70,34 +32,6 @@ The simulation investigates:
 -   What is the impact of **reaction time distribution**?
 -   How does **limited visibility (smoke)** change evacuation routes?
 -   Can **leader agents** improve evacuation efficiency?
-
-------------------------------------------------------------------------
-
-# Technology Stack
-
-Possible implementations:
-
-## Core Simulation
-
--   Python
--   Mesa (agent-based modeling framework)
-
-## Visualization
-
--   Pygame / Mesa visualization tools
--   Matplotlib for analysis
-
-## Data Analysis
-
--   NumPy
--   Pandas
--   Scikit-learn
-
-## Advanced AI 
-
--   PyTorch / TensorFlow
--   reinforcement learning
--   graph neural networks
 
 ------------------------------------------------------------------------
 
