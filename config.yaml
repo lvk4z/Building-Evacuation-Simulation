@@ -1,0 +1,36 @@
+simulation:
+  dt: 0.05
+  max_time: 180.0
+  seed: 42
+  record_interval: 4
+
+building:
+  width_m: 36.0
+  height_m: 20.0
+  cell_size: 0.4
+
+agents:
+  total: 190
+  desired_speed_mean: 1.0
+  desired_speed_std: 0.2
+  mass_mean: 80.0
+  mass_std: 12.0
+  radius_min: 0.22
+  radius_max: 0.32
+  reaction_time_scale: 12.0
+  reaction_time_sigma: 0.35
+  relaxation_time: 0.5
+  max_speed_factor: 1.8
+
+social_force:
+  A: 2000.0
+  B: 0.08
+  k: 120000.0
+  kappa: 240000.0
+  obstacle_strength: 2800.0
+  obstacle_range: 0.06
+  neighbour_radius: 1.4
+
+visualization:
+  interval_ms: 50
+  trail_length: 8

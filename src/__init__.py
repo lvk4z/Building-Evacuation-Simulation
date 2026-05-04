@@ -1,0 +1,1 @@
+"""Building evacuation simulation package."""
