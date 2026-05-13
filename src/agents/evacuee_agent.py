@@ -44,39 +44,25 @@ class EvacueeAgent(mesa.Agent):
     ) -> None:
         super().__init__(model)
 
-        # Physical state
         self.position: np.ndarray = position.copy()
         self.velocity: np.ndarray = np.zeros(2, dtype=float)
 
-        # Body parameters
         self.desired_speed: float = desired_speed
         self.max_speed: float = max_speed
         self.mass: float = mass
         self.radius: float = radius
         self.relaxation_time: float = relaxation_time
 
-        # Behavioural / evacuation state
         self.reaction_time: float = reaction_time
         self.exit_name: Optional[str] = None
         self.exited: bool = False
         self.exit_time: Optional[float] = None
         self.agent_type: str = agent_type
 
-        # pos is the Mesa ContinuousSpace coordinate (tuple)
         self.pos: Optional[tuple[float, float]] = None
 
-    # ------------------------------------------------------------------
-    # Mesa interface
-    # ------------------------------------------------------------------
-
     def step(self) -> None:
-        """Mesa hook — physics are computed in the model's step instead."""
-        # Forces are computed and applied by EvacuationModel.step()
-        # so this is intentionally a no-op.
-
-    # ------------------------------------------------------------------
-    # Helpers used by the model
-    # ------------------------------------------------------------------
+        """No-op — physics are computed centrally in EvacuationModel.step()."""
 
     def is_active(self, current_time: float) -> bool:
         """Return True once pre-evacuation delay has elapsed."""
@@ -92,10 +78,6 @@ class EvacueeAgent(mesa.Agent):
         self.exited = True
         self.exit_time = current_time
         self.velocity = np.zeros(2, dtype=float)
-
-    # ------------------------------------------------------------------
-    # Representations
-    # ------------------------------------------------------------------
 
     def __repr__(self) -> str:
         return (

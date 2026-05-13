@@ -93,11 +93,7 @@ def _agent_sizes(result: SimulationResult) -> np.ndarray:
 
 
 def _agent_colors(frame: FrameSnapshot, result: SimulationResult) -> np.ndarray:
-    """Color agents by visible state.
-
-    Waiting agents are yellow, moving agents blue, congested active agents red,
-    and evacuated agents green.
-    """
+    """Color agents by state: waiting=yellow, moving=blue, congested=red, evacuated=green."""
 
     desired_speeds = np.array([agent.desired_speed for agent in result.agents], dtype=float)
     colors: list[str] = []

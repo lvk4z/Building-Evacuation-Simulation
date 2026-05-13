@@ -243,9 +243,6 @@ class BuildingLayout:
         if self.is_walkable_point(slide_y):
             return slide_y
 
-        # Corner cases around door frames and columns can trap agents on the
-        # coarse grid. As a lightweight fallback, steer toward the closest
-        # walkable neighboring cell center.
         current_cell = self.world_to_cell(old_point)
         walkable_neighbors: list[np.ndarray] = []
         for dx in (-1, 0, 1):

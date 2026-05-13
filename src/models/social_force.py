@@ -79,11 +79,7 @@ def obstacle_repulsion(
     obstacle_points: np.ndarray,
     params: SocialForceParameters,
 ) -> np.ndarray:
-    """Approximate wall repulsion using blocked grid-cell centers.
-
-    This is intentionally simple for the alpha version. It produces enough
-    local obstacle avoidance to keep agents from sticking to walls and columns.
-    """
+    """Approximate wall repulsion using blocked grid-cell centers."""
 
     if obstacle_tree is None or obstacle_points.size == 0:
         return np.zeros(2, dtype=float)

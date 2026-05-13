@@ -97,7 +97,6 @@ class EvacuationModel(mesa.Model):
         # Mesa Model uses `rng` to seed numpy's Generator.
         super().__init__(rng=scenario.simulation.seed)
 
-        # ── Environment ───────────────────────────────────────────────
         self.layout = BuildingLayout.baseline(**scenario.building)
         self.floor_field = StaticFloorField(self.layout)
         self.navigation = NavigationModel(self.floor_field)
@@ -108,25 +107,20 @@ class EvacuationModel(mesa.Model):
             cKDTree(self.obstacle_points) if self.obstacle_points.size else None
         )
 
-        # ── Simulation parameters ─────────────────────────────────────
         self.dt: float = scenario.simulation.dt
         self.max_time: float = scenario.simulation.max_time
         self.record_interval: int = max(1, scenario.simulation.record_interval)
         self.current_time: float = 0.0
         self._step_count: int = 0
 
-        # ── Mesa ContinuousSpace ──────────────────────────────────────
-        # Agents live in a 2-D space matching the building dimensions.
         self.space = ContinuousSpace(
             x_max=self.layout.width_m,
             y_max=self.layout.height_m,
             torus=False,
         )
 
-        # ── Create agents ─────────────────────────────────────────────
         self._create_agents(scenario.agents)
 
-        # ── Mesa DataCollector ────────────────────────────────────────
         self.datacollector = DataCollector(
             model_reporters={
                 "time": "current_time",
@@ -145,15 +139,10 @@ class EvacuationModel(mesa.Model):
             },
         )
 
-        # ── Frame buffer for animation ────────────────────────────────
         self.frames: list[FrameSnapshot] = []
         self._record_frame()
 
         self.datacollector.collect(self)
-
-    # ------------------------------------------------------------------
-    # Agent construction
-    # ------------------------------------------------------------------
 
     def _sample_reaction_time(self, params: AgentParameters) -> float:
         return float(
@@ -187,14 +176,8 @@ class EvacuationModel(mesa.Model):
                 reaction_time=reaction_time,
                 agent_type="regular",
             )
-            # Assign the nearest exit using the static floor field.
             self.navigation.assign_exit(agent)
-            # Register position in the Mesa ContinuousSpace.
             self.space.place_agent(agent, (float(position[0]), float(position[1])))
-
-    # ------------------------------------------------------------------
-    # Mesa Model.step() — called once per dt tick
-    # ------------------------------------------------------------------
 
     def step(self) -> None:
         """Advance the simulation by one time step (dt seconds).
@@ -300,7 +283,6 @@ class EvacuationModel(mesa.Model):
                 continue
 
             agent.apply_update(next_positions[agent_index], next_velocities[agent_index])
-            # Keep Mesa ContinuousSpace in sync.
             self.space.move_agent(
                 agent,
                 (float(agent.position[0]), float(agent.position[1])),
@@ -311,11 +293,9 @@ class EvacuationModel(mesa.Model):
             ):
                 agent.mark_exited(self.current_time)
 
-        # --- Record frame for animation ---
         if self._step_count % self.record_interval == 0:
             self._record_frame()
 
-        # --- Collect Mesa metrics ---
         self.datacollector.collect(self)
 
         if self.all_evacuated:
@@ -333,7 +313,6 @@ class EvacuationModel(mesa.Model):
         while self.running:
             self.step()
 
-        # Ensure the final state is captured in the frame buffer.
         if not self.frames or self.frames[-1].time < self.current_time:
             self._record_frame()
 
@@ -346,10 +325,6 @@ class EvacuationModel(mesa.Model):
             metrics=metrics,
             dt=self.dt,
         )
-
-    # ------------------------------------------------------------------
-    # Properties
-    # ------------------------------------------------------------------
 
     @property
     def all_evacuated(self) -> bool:
@@ -371,10 +346,6 @@ class EvacuationModel(mesa.Model):
         """Mean speed of agents that have not exited yet."""
         active_speeds = [np.linalg.norm(a.velocity) for a in self.agents if not a.exited]
         return float(np.mean(active_speeds)) if active_speeds else 0.0
-
-    # ------------------------------------------------------------------
-    # Private helpers
-    # ------------------------------------------------------------------
 
     def _nudge_toward_better_cell(
         self, agent: EvacueeAgent, old_point: np.ndarray
