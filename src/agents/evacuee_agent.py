@@ -41,6 +41,7 @@ class EvacueeAgent(mesa.Agent):
         relaxation_time: float,
         reaction_time: float,
         agent_type: str = "regular",
+        preferred_exit: str | None = None,
     ) -> None:
         super().__init__(model)
 
@@ -58,6 +59,8 @@ class EvacueeAgent(mesa.Agent):
         self.exited: bool = False
         self.exit_time: Optional[float] = None
         self.agent_type: str = agent_type
+        # Leaders use a fixed preferred exit; None means dynamic best-exit.
+        self.preferred_exit: Optional[str] = preferred_exit
 
         self.pos: Optional[tuple[float, float]] = None
 

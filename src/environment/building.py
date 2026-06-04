@@ -294,8 +294,12 @@ class BuildingLayout:
             positions.append(point)
 
         if len(positions) != count:
-            raise RuntimeError(
-                f"Could only place {len(positions)} / {count} agents. Reduce the count or min_distance."
+            import warnings
+            warnings.warn(
+                f"Could only place {len(positions)} / {count} agents. "
+                "Proceeding with fewer agents (smoke may have blocked spawn zones).",
+                RuntimeWarning,
+                stacklevel=2,
             )
 
         return positions

@@ -28,6 +28,7 @@ from src.agents.evacuee_agent import EvacueeAgent
 from src.analysis.metrics import SimulationMetrics, compute_metrics
 from src.environment.building import BuildingLayout
 from src.environment.floor_field import StaticFloorField
+from src.environment.smoke_model import SmokeLayer
 from src.models.navigation import NavigationModel
 from src.models.social_force import (
     SocialForceParameters,
@@ -36,7 +37,7 @@ from src.models.social_force import (
     limit_speed,
     obstacle_repulsion,
 )
-from src.simulation.scenario import AgentParameters, BaselineScenario
+from src.simulation.scenario import AgentParameters, BaselineScenario, ScenarioType
 
 
 @dataclass(slots=True)
@@ -98,9 +99,29 @@ class EvacuationModel(mesa.Model):
         super().__init__(rng=scenario.simulation.seed)
 
         self.layout = BuildingLayout.baseline(**scenario.building)
-        self.floor_field = StaticFloorField(self.layout)
+        self.scenario_type = scenario.scenario_type
+
+        # --- Smoke / fire setup (Scenario B) ---
+        self.smoke: SmokeLayer | None = None
+        disabled_exits: list[str] = []
+        if scenario.smoke is not None:
+            cfg = scenario.smoke
+            self.smoke = SmokeLayer(
+                layout=self.layout,
+                origin=(cfg.fire_origin_x, cfg.fire_origin_y),
+                spread_rate=cfg.spread_rate,
+                visibility_threshold=cfg.visibility_threshold,
+            )
+            disabled_exits = list(cfg.disabled_exits)
+            # Start with minimal initial smoke (just seeds the origin cell).
+            # Smoke grows dynamically each step via model.step().
+            self.smoke.step(current_time=0.0, dt=scenario.simulation.dt)
+            self.smoke.apply_to_layout()
+
+        self.floor_field = StaticFloorField(self.layout, disabled_exits=disabled_exits)
         self.navigation = NavigationModel(self.floor_field)
         self.sfm_params: SocialForceParameters = scenario.social_force
+        self._disabled_exits: set[str] = set(disabled_exits)
 
         self.obstacle_points = self.layout.get_blocked_cell_centers()
         self.obstacle_tree = (
@@ -119,7 +140,7 @@ class EvacuationModel(mesa.Model):
             torus=False,
         )
 
-        self._create_agents(scenario.agents)
+        self._create_agents(scenario)
 
         self.datacollector = DataCollector(
             model_reporters={
@@ -152,18 +173,51 @@ class EvacuationModel(mesa.Model):
             )
         )
 
-    def _create_agents(self, params: AgentParameters) -> None:
+    def _create_agents(self, scenario: BaselineScenario) -> None:
+        params = scenario.agents
+        leaders_cfg = scenario.leaders
+
+        # Spawn agents on the ORIGINAL (pre-smoke) walkable map so that agents
+        # are present in every room including the fire room.  Navigation still
+        # uses the smoke-blocked floor field that was computed before this call.
+        if self.smoke is not None:
+            _saved_walkable = self.layout.walkable.copy()
+            self.layout.walkable[:] = self.smoke._original_walkable
+
         positions = self.layout.sample_spawn_positions(
             count=params.total, rng=self.rng, min_distance=0.62
         )
 
-        for position in positions:
-            desired_speed = float(
-                max(0.6, self.rng.normal(params.desired_speed_mean, params.desired_speed_std))
-            )
+        if self.smoke is not None:
+            self.layout.walkable[:] = _saved_walkable
+
+        n_leaders = int(params.total * leaders_cfg.fraction) if leaders_cfg else 0
+        # Pre-assign leaders to the globally best exit from their spawn position.
+        for idx, position in enumerate(positions):
+            is_leader = idx < n_leaders
+
+            if is_leader and leaders_cfg is not None:
+                desired_speed = float(
+                    max(0.4, self.rng.normal(leaders_cfg.speed_mean, leaders_cfg.speed_std))
+                )
+                reaction_time = float(
+                    self.rng.lognormal(mean=np.log(leaders_cfg.reaction_time_scale), sigma=0.3)
+                )
+                agent_type = "leader"
+                # Leaders keep a fixed exit assigned once at creation.
+                preferred_exit = self.navigation.best_exit(
+                    position, excluded_exits=self._disabled_exits
+                )
+            else:
+                desired_speed = float(
+                    max(0.6, self.rng.normal(params.desired_speed_mean, params.desired_speed_std))
+                )
+                reaction_time = self._sample_reaction_time(params)
+                agent_type = "regular"
+                preferred_exit = None
+
             mass = float(max(45.0, self.rng.normal(params.mass_mean, params.mass_std)))
             radius = float(self.rng.uniform(params.radius_min, params.radius_max))
-            reaction_time = self._sample_reaction_time(params)
 
             agent = EvacueeAgent(
                 model=self,
@@ -174,7 +228,8 @@ class EvacuationModel(mesa.Model):
                 radius=radius,
                 relaxation_time=params.relaxation_time,
                 reaction_time=reaction_time,
-                agent_type="regular",
+                agent_type=agent_type,
+                preferred_exit=preferred_exit,
             )
             self.navigation.assign_exit(agent)
             self.space.place_agent(agent, (float(position[0]), float(position[1])))
@@ -212,8 +267,13 @@ class EvacuationModel(mesa.Model):
         for agent_index in active_indices:
             agent = agents_list[agent_index]
 
-            # Dynamic exit selection: pick closest at each step.
-            agent.exit_name = self.floor_field.best_exit(agent.position)
+            # Leaders use their fixed preferred exit; regular agents pick best dynamically.
+            if agent.preferred_exit is not None:
+                agent.exit_name = agent.preferred_exit
+            else:
+                agent.exit_name = self.navigation.best_exit(
+                    agent.position, excluded_exits=self._disabled_exits
+                )
             desired_direction = self.navigation.desired_direction(agent)
 
             # --- SFM force accumulation ---
@@ -292,6 +352,15 @@ class EvacuationModel(mesa.Model):
                 agent.position, agent.exit_name
             ):
                 agent.mark_exited(self.current_time)
+
+        # --- Dynamic smoke update (must run after time increment) ---
+        if self.smoke is not None:
+            self.smoke.step(current_time=self.current_time, dt=self.dt)
+            self.smoke.apply_to_layout()
+            self.obstacle_points = self.layout.get_blocked_cell_centers()
+            self.obstacle_tree = (
+                cKDTree(self.obstacle_points) if self.obstacle_points.size else None
+            )
 
         if self._step_count % self.record_interval == 0:
             self._record_frame()

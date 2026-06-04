@@ -14,13 +14,29 @@ class StaticFloorField:
     Each exit gets its own distance map. Agents then follow the local descent
     direction of the chosen map, which is enough for a baseline simulation
     without dynamic rerouting.
+
+    When a :class:`~src.environment.smoke_model.SmokeLayer` is active,
+    call :meth:`recompute` after the smoke layer patches ``layout.walkable``
+    to get updated distance maps that route agents around smoke.
     """
 
-    def __init__(self, layout: BuildingLayout) -> None:
+    def __init__(self, layout: BuildingLayout, disabled_exits: list[str] | None = None) -> None:
         self.layout = layout
+        self.disabled_exits: set[str] = set(disabled_exits or [])
         self.distance_maps: dict[str, np.ndarray] = {
             name: self._compute_distance_map(exit_def.cells)
             for name, exit_def in layout.exits.items()
+            if name not in self.disabled_exits
+        }
+
+    def recompute(self, disabled_exits: list[str] | None = None) -> None:
+        """Recompute all distance maps — call after smoke modifies walkable."""
+        if disabled_exits is not None:
+            self.disabled_exits = set(disabled_exits)
+        self.distance_maps = {
+            name: self._compute_distance_map(exit_def.cells)
+            for name, exit_def in self.layout.exits.items()
+            if name not in self.disabled_exits
         }
 
     def _compute_distance_map(self, exit_cells: Iterable[tuple[int, int]]) -> np.ndarray:
