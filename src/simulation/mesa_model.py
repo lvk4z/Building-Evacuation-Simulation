@@ -134,6 +134,15 @@ class EvacuationModel(mesa.Model):
         self.current_time: float = 0.0
         self._step_count: int = 0
 
+        # How often to recompute smoke (only when radius grows ≥ 1 grid cell).
+        # Between updates the BFS result is identical, so there is no accuracy loss.
+        if self.smoke is not None:
+            self._smoke_update_interval: int = max(
+                1, int(self.layout.cell_size / max(self.smoke.spread_rate * self.dt, 1e-9))
+            )
+        else:
+            self._smoke_update_interval = 1
+
         self.space = ContinuousSpace(
             x_max=self.layout.width_m,
             y_max=self.layout.height_m,
@@ -353,8 +362,8 @@ class EvacuationModel(mesa.Model):
             ):
                 agent.mark_exited(self.current_time)
 
-        # --- Dynamic smoke update (must run after time increment) ---
-        if self.smoke is not None:
+        # --- Dynamic smoke update (only when radius grows by ≥ 1 cell) ---
+        if self.smoke is not None and self._step_count % self._smoke_update_interval == 0:
             self.smoke.step(current_time=self.current_time, dt=self.dt)
             self.smoke.apply_to_layout()
             self.obstacle_points = self.layout.get_blocked_cell_centers()
